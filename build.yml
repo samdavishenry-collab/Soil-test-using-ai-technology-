@@ -1,0 +1,49 @@
+name: Build Release APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 'stable'
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Create temporary keystore
+        run: |
+          keytool -genkeypair -alias ai_soil_alias -keyalg RSA -keysize 2048 -validity 10000 -keystore release-keystore.jks -storepass changeit -keypass changeit -dname "CN=AI Soil Tester, OU=Dev, O=You, L=City, ST=State, C=IN"
+
+      - name: Create key.properties file
+        run: |
+          echo "storePassword=changeit" > android/key.properties
+          echo "keyPassword=changeit" >> android/key.properties
+          echo "keyAlias=ai_soil_alias" >> android/key.properties
+          echo "storeFile=release-keystore.jks" >> android/key.properties
+
+      - name: Move keystore into android folder
+        run: mv release-keystore.jks android/
+
+      - name: Build release APK
+        run: flutter build apk --release --target-platform android-arm,android-arm64,android-x64
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai_soil_tester_apk
+          path: build/app/outputs/flutter-apk/app-release.apk
